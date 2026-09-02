@@ -85,4 +85,67 @@ describe("patch smoke", function()
         end)
     end)
 
+    it("installs the timeline methods and menu entry on a capable class", function()
+        withArtifact(function(captured)
+            local class = fullClass()
+            local orig_show = class.showTimeline
+            captured.fn(class)
+            assert.are.equal("function", type(class.presenceMapEnabled))
+            assert.are.equal("function", type(class.timelineRowSpecs))
+            assert.are.equal("function", type(class.timelinePriorSpecs))
+            assert.are.equal("function", type(class.settingEnabled))
+            assert.is_true(class.showTimeline ~= orig_show)
+            local self = setmetatable({}, { __index = class })
+            local items = self:getSubMenuItems()
+            assert.are.equal(3, #items)
+            assert.are.equal("function", type(items[3].checked_func))
+            assert.are.equal("function", type(items[3].callback))
+            assert.are.equal(0, #captured.warnings)
+        end)
+    end)
+
+    it("does not overwrite an existing settingEnabled", function()
+        withArtifact(function(captured)
+            local class = fullClass()
+            local marker = function() return true end
+            class.settingEnabled = marker
+            captured.fn(class)
+            assert.are.equal(marker, class.settingEnabled)
+        end)
+    end)
+
+    it("injects translations absent-only", function()
+        withArtifact(function(captured)
+            local T = dofile("src/translations.lua")
+            local class = fullClass()
+            captured.fn(class)
+            local self = setmetatable({
+                loc = { current_language = "de",
+                        translations = { menu_timeline_all = "OFFICIAL" },
+                        t = function(loc, key) return loc.translations[key] or key end },
+            }, { __index = class })
+            self:getSubMenuItems()
+            assert.are.equal("OFFICIAL", self.loc.translations.menu_timeline_all)
+            assert.are.equal(T.de.menu_timeline_presence_map,
+                self.loc.translations.menu_timeline_presence_map)
+            assert.are.equal(T.de.timeline_sort_oldest,
+                self.loc.translations.timeline_sort_oldest)
+        end)
+    end)
+
+    it("falls back to the stock timeline when the ported view errors", function()
+        withArtifact(function(captured)
+            local class = fullClass()
+            local stock_called = false
+            class.showTimeline = function(self) stock_called = true end
+            captured.fn(class)
+            -- Bare instance: the ported view errors immediately (no ui/doc),
+            -- pcall catches it, and the stock method must be invoked.
+            local self = setmetatable({}, { __index = class })
+            self:showTimeline()
+            assert.is_true(stock_called)
+            assert.are.equal(1, #captured.warnings)
+        end)
+    end)
+
 end)
