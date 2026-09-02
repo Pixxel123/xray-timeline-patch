@@ -1,0 +1,18 @@
+name: CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install LuaJIT
+        run: sudo apt-get update && sudo apt-get install -y luajit
+      - name: Run specs
+        run: luajit tools/spec_runner.lua
+      - name: Rebuild the patch artifact
+        run: luajit tools/build.lua
+      - name: Fail if the committed artifact drifted from src/
+        run: git diff --exit-code patches/
