@@ -8,8 +8,8 @@ that character appears. Tap one character to filter chapters; tap two to find
 the chapters they share. Includes a sort-direction toggle, jump-to-end
 chevrons, and a collapsible block for prior books in a series.
 
-Runs entirely as a patch: no fork, no plugin replacement, and removing one
-file restores the stock timeline.
+The plugin itself is never modified: delete the file and the stock
+timeline is back.
 
 ## Install
 
@@ -19,14 +19,14 @@ file restores the stock timeline.
    KOReader settings if it doesn't exist).
 3. Restart KOReader and open **X-Ray → Plot Timeline**.
 
-Toggle the map under the new **Use Presence Map in Timeline** entry at the
+Toggle the map under **Use Presence Map in Timeline** at the
 bottom of the X-Ray menu.
 
 ## Compatibility
 
 - X-Ray plugin **26.7.27** or newer; KOReader **2026.07** or newer (tested).
 - On an incompatible plugin version the patch logs one warning and leaves
-  the stock timeline untouched — it degrades, it doesn't crash.
+  the stock timeline untouched.
 - Translated into the plugin's 17 languages.
 
 ## Limitations
@@ -39,7 +39,7 @@ bottom of the X-Ray menu.
 ## Development
 
 Tests: `luajit tools/spec_runner.lua` (self-contained runner, no luarocks).
-The installable file is **generated** — edit `src/`, then `luajit
+The installable file is generated: edit `src/`, then `luajit
 tools/build.lua`; CI fails if the committed artifact drifts from `src/`.
 
 Syncing from the development branch (`timeline-presence-map` on the plugin
