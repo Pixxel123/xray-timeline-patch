@@ -140,6 +140,7 @@ _G.assert.is_truthy = _G.assert.truthy
 -- List of spec files to execute
 local specs = {
     "spec/xray_presencemap_spec.lua",
+    "spec/translations_spec.lua",
 }
 
 if arg and arg[1] then
