@@ -3,7 +3,7 @@
 
 local PATCH_VERSION = "1.0.0"
 local SOURCE_COMMIT = "c082f69"   -- timeline-presence-map commit the port tracks
-local PLUGIN_FLOOR  = "26.8.27"   -- verified by plan Task 6; update there
+local PLUGIN_FLOOR  = "26.7.8"   -- verified by plan Task 6; update there
 
 local function slurp(path)
     local f = assert(io.open(path, "r"), "missing " .. path)
