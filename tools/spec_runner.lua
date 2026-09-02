@@ -141,6 +141,7 @@ _G.assert.is_truthy = _G.assert.truthy
 local specs = {
     "spec/xray_presencemap_spec.lua",
     "spec/translations_spec.lua",
+    "spec/patch_smoke_spec.lua",
 }
 
 if arg and arg[1] then
