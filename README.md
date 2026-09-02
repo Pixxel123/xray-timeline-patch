@@ -24,7 +24,7 @@ bottom of the X-Ray menu.
 
 ## Compatibility
 
-- X-Ray plugin **26.7.8** or newer; KOReader **2026.07** or newer (tested).
+- X-Ray plugin **26.7.27** or newer; KOReader **2026.07** or newer (tested).
 - On an incompatible plugin version the patch logs one warning and leaves
   the stock timeline untouched — it degrades, it doesn't crash.
 - Translated into the plugin's 17 languages.

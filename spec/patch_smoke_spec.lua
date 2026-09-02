@@ -35,6 +35,7 @@ local function makeStubs()
     stubs["ui/widget/container/inputcontainer"] = {
         extend = function(base, proto) return setmetatable(proto, { __index = base }) end,
     }
+    stubs.xray_utils = { flattenTOC = function() return {} end }
     return captured, stubs
 end
 
@@ -144,6 +145,17 @@ describe("patch smoke", function()
             local self = setmetatable({}, { __index = class })
             self:showTimeline()
             assert.is_true(stock_called)
+            assert.are.equal(1, #captured.warnings)
+        end)
+    end)
+
+    it("leaves the class stock when xray_utils lacks flattenTOC", function()
+        withArtifact(function(captured)
+            package.loaded["xray_utils"] = {}   -- no flattenTOC
+            local class = fullClass()
+            local orig_show = class.showTimeline
+            captured.fn(class)
+            assert.are.equal(orig_show, class.showTimeline)
             assert.are.equal(1, #captured.warnings)
         end)
     end)

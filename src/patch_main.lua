@@ -911,10 +911,16 @@ local function menuEntry(self)
         checked_func = function() return self:presenceMapEnabled() end,
         callback = function()
             if self.ai_helper and self.ai_helper.settings then
-                self.ai_helper:saveSettings({
-                    timeline_presence_map = not self:presenceMapEnabled() })
-                -- Rebuild if the Timeline is open behind this menu.
-                if self.timeline_menu then self:showTimeline() end
+                local ok, err = pcall(function()
+                    self.ai_helper:saveSettings({
+                        timeline_presence_map = not self:presenceMapEnabled() })
+                    -- Rebuild if the Timeline is open behind this menu.
+                    if self.timeline_menu then self:showTimeline() end
+                end)
+                if not ok then
+                    logger.warn("xray-timeline-patch: presence map toggle failed: "
+                        .. tostring(err))
+                end
             end
         end,
         separator = true,
@@ -934,6 +940,12 @@ local function missingCapability(XRayPlugin)
     end
     for _, mod in ipairs(REQUIRED_MODULES) do
         if not pcall(pluginRequire, mod) then return "module " .. mod end
+    end
+    -- The ported view calls utils:flattenTOC, which older plugin versions lack;
+    -- probe it so an incompatible install degrades with one named warning.
+    local utils = pluginRequire("xray_utils")
+    if type(utils) ~= "table" or type(utils.flattenTOC) ~= "function" then
+        return "method xray_utils.flattenTOC"
     end
     return nil
 end
