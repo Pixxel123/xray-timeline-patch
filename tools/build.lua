@@ -27,6 +27,7 @@ local out = table.concat({
     header,
     "local Presence = (function()\n", slurp("src/xray_presencemap.lua"), "\nend)()\n\n",
     "local TRANSLATIONS = (function()\n", slurp("src/translations.lua"), "\nend)()\n\n",
+    "local Strip = (function()\n", slurp("src/xray_timeline_strip.lua"), "\nend)()\n\n",
     slurp("src/patch_main.lua"),
 })
 

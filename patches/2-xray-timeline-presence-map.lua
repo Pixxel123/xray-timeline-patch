@@ -254,21 +254,8 @@ function M.bucketMatrix(matrix, chapter_matches, n_buckets)
     return buckets, matches, ranges
 end
 
--- Which characters get a row: the selection, or everyone when unfiltered.
--- Shared with the UI's height calculation so the two cannot disagree.
-function M.shownNames(order, selected)
-    if not selected or #selected == 0 then return order end
-    local is_selected = {}
-    for _, name in ipairs(selected) do is_selected[name] = true end
-    local rows = {}
-    for _, name in ipairs(order) do
-        if is_selected[name] then rows[#rows + 1] = name end
-    end
-    return rows
-end
-
--- Pixel height of a strip with this many character rows. Exported so the UI's
--- scroll cap cannot drift from what the renderers draw.
+-- Pixel height of a strip with this many rows. Exported so the strip
+-- widget's scroll viewport cannot drift from what the renderers draw.
 function M.stripHeight(n_rows, geom)
     return geom.top_padding + n_rows * geom.row_height + 4
 end
@@ -288,40 +275,54 @@ local function svgOpen(w, h)
     }
 end
 
--- The left gutter: one name per row. Split from the grid so it stays put while
--- the grid scrolls. Returns svg, width, height.
+local function selectedSet(selected)
+    local set = {}
+    for _, name in ipairs(selected or {}) do set[name] = true end
+    return set
+end
+
+-- The left gutter: one name per row, every row in `order`. Selected names
+-- are bold on a shaded band. Split from the grid so it stays put while the
+-- grid scrolls. Returns svg, width, height.
 function M.buildStripNamesSVG(order, selected, geom)
-    local rows = M.shownNames(order, selected)
-    local width, height = geom.name_width, M.stripHeight(#rows, geom)
+    local is_selected = selectedSet(selected)
+    local width, height = geom.name_width, M.stripHeight(#order, geom)
     local out = svgOpen(width, height)
-    for r, name in ipairs(rows) do
+    for r, name in ipairs(order) do
         local y = geom.top_padding + (r - 1) * geom.row_height + geom.row_height / 2
+        if is_selected[name] then
+            out[#out + 1] = string.format(
+                '<rect class="band" x="0" y="%.1f" width="%d" height="%d" fill="#e3e6df"/>',
+                y - geom.row_height / 2, width, geom.row_height)
+        end
         out[#out + 1] = string.format(
-            '<text class="cname" x="%.1f" y="%.1f" font-size="%d" text-anchor="end" fill="black">%s</text>',
-            width - 7, y + 3, geom.label_size + 2, xmlEscape(name))
+            '<text class="cname" x="%.1f" y="%.1f" font-size="%d" text-anchor="end" fill="black"%s>%s</text>',
+            width - 7, y + 3, geom.label_size + 2,
+            is_selected[name] and ' font-weight="bold"' or "", xmlEscape(name))
     end
     out[#out + 1] = "</svg>"
     return table.concat(out, "\n"), width, height
 end
 
--- The grid: columns as chapters (or bucketed spans), one row per shown name.
--- Returns svg, width, height.
+-- The grid: columns as chapters (or bucketed spans), one row per name in
+-- `order`. Returns svg, width, height.
 --
--- Every column is kept while filtering, to show where in the book the matches
--- fall. Matching columns are shaded. Two or more selections draw a join line,
--- which is safe because only selected characters have rows here.
+-- Every row and every column stays while filtering, so the reader can see
+-- where the matches fall against everyone else. Selected rows get a band,
+-- matching columns a shade, and two or more selections a join line from the
+-- first selected row to the last.
 --
 -- match_cols must be passed in. A bucketed matrix has already lost the
 -- per-chapter detail, so the crossings cannot be worked out here.
 function M.buildStripGridSVG(matrix, order, chapters, selected, geom, match_cols)
-    local rows = M.shownNames(order, selected)
-    local filtering = selected and #selected > 0
+    local is_selected = selectedSet(selected)
+    local filtering = selected ~= nil and #selected > 0
 
     local matches = {}
     for _, idx in ipairs(match_cols or {}) do matches[idx] = true end
 
-    local ncols = #chapters
-    local width, height = ncols * geom.col_width, M.stripHeight(#rows, geom)
+    local nrows, ncols = #order, #chapters
+    local width, height = ncols * geom.col_width, M.stripHeight(nrows, geom)
     local out = svgOpen(width, height)
 
     local function colX(i) return (i - 1) * geom.col_width + geom.col_width / 2 end
@@ -329,24 +330,35 @@ function M.buildStripGridSVG(matrix, order, chapters, selected, geom, match_cols
         return geom.top_padding + (r - 1) * geom.row_height + geom.row_height / 2
     end
 
+    local first_sel, last_sel
+    for r, name in ipairs(order) do
+        if is_selected[name] then
+            first_sel = first_sel or r
+            last_sel = r
+            out[#out + 1] = string.format(
+                '<rect class="band" x="0" y="%.1f" width="%d" height="%d" fill="#e3e6df"/>',
+                rowY(r) - geom.row_height / 2, width, geom.row_height)
+        end
+    end
+
     if filtering then
-        local join = #rows >= 2
+        local join = first_sel ~= nil and last_sel > first_sel
         for i = 1, ncols do
             if matches[i] then
                 out[#out + 1] = string.format(
-                    '<rect class="shade" x="%.1f" y="%.1f" width="%d" height="%.1f" fill="#e3e6df"/>',
+                    '<rect class="shade" x="%.1f" y="%.1f" width="%d" height="%.1f" fill="#d5d9cf"/>',
                     colX(i) - geom.col_width / 2, geom.top_padding - 4,
-                    geom.col_width, #rows * geom.row_height + 4)
+                    geom.col_width, nrows * geom.row_height + 4)
                 if join then
                     out[#out + 1] = string.format(
                         '<line class="join" x1="%.1f" y1="%.1f" x2="%.1f" y2="%.1f" stroke="black" stroke-width="2"/>',
-                        colX(i), rowY(1), colX(i), rowY(#rows))
+                        colX(i), rowY(first_sel), colX(i), rowY(last_sel))
                 end
             end
         end
     end
 
-    for r, name in ipairs(rows) do
+    for r, name in ipairs(order) do
         for i = 1, ncols do
             if matrix[i] and matrix[i][name] then
                 out[#out + 1] = string.format(
@@ -361,134 +373,362 @@ function M.buildStripGridSVG(matrix, order, chapters, selected, geom, match_cols
     return table.concat(out, "\n"), width, height
 end
 
+-- Which row a tap lands on. y_rel is measured from the top of the names
+-- image, in the units geom uses. nil above the first row or past the last.
+function M.rowAt(y_rel, geom, n_rows)
+    if type(y_rel) ~= "number" or y_rel < geom.top_padding then return nil end
+    local row = math.floor((y_rel - geom.top_padding) / geom.row_height) + 1
+    if row < 1 or row > (n_rows or 0) then return nil end
+    return row
+end
+
+-- The filter caption: names joined by a middle dot, then the number of
+-- matching chapters in the stock title's "(N)" style, so it needs no
+-- translated words. Empty when nothing is selected.
+function M.captionText(selected, n_matches)
+    if not selected or #selected == 0 then return "" end
+    return table.concat(selected, " \u{00B7} ") .. " (" .. tostring(n_matches or 0) .. ")"
+end
+
 return M
 
 end)()
 
 local TRANSLATIONS = (function()
 -- Generated by tools/extract_translations.lua - DO NOT EDIT.
--- 5 timeline keys x 17 languages, byte-identical to the plugin's .po parse.
+-- 2 timeline keys x 17 languages, byte-identical to the plugin's .po parse.
 return {
     ["ar"] = {
         ["menu_timeline_all"] = "الكل",
         ["menu_timeline_presence_map"] = "استخدام خريطة الحضور في الخط الزمني",
-        ["timeline_no_shared_chapters"] = "%s لا يظهران معًا في أي فصل.\\n\\nاضغط على %s لعرض الكتاب كاملاً.",
-        ["timeline_sort_newest"] = "الأحدث أولاً",
-        ["timeline_sort_oldest"] = "الأقدم أولاً",
     },
     ["de"] = {
         ["menu_timeline_all"] = "Alle",
         ["menu_timeline_presence_map"] = "Präsenzkarte in der Zeitleiste verwenden",
-        ["timeline_no_shared_chapters"] = "%s teilen sich kein Kapitel.\\n\\nTippen Sie auf %s, um das ganze Buch zu sehen.",
-        ["timeline_sort_newest"] = "Neueste zuerst",
-        ["timeline_sort_oldest"] = "Älteste zuerst",
     },
     ["en"] = {
         ["menu_timeline_all"] = "All",
         ["menu_timeline_presence_map"] = "Use Presence Map in Timeline",
-        ["timeline_no_shared_chapters"] = "%s never share a chapter.\\n\\nTap %s to see the whole book.",
-        ["timeline_sort_newest"] = "Newest first",
-        ["timeline_sort_oldest"] = "Oldest first",
     },
     ["es"] = {
         ["menu_timeline_all"] = "Todos",
         ["menu_timeline_presence_map"] = "Usar mapa de presencia en la cronología",
-        ["timeline_no_shared_chapters"] = "%s no comparten ningún capítulo.\\n\\nToca %s para ver todo el libro.",
-        ["timeline_sort_newest"] = "Más recientes primero",
-        ["timeline_sort_oldest"] = "Más antiguos primero",
     },
     ["fr"] = {
         ["menu_timeline_all"] = "Tous",
         ["menu_timeline_presence_map"] = "Utiliser la carte de présence dans la chronologie",
-        ["timeline_no_shared_chapters"] = "%s ne partagent aucun chapitre.\\n\\nAppuyez sur %s pour voir tout le livre.",
-        ["timeline_sort_newest"] = "Plus récents d'abord",
-        ["timeline_sort_oldest"] = "Plus anciens d'abord",
     },
     ["hu"] = {
         ["menu_timeline_all"] = "Mind",
         ["menu_timeline_presence_map"] = "Jelenléti térkép használata az idővonalon",
-        ["timeline_no_shared_chapters"] = "%s nem szerepelnek közös fejezetben.\\n\\nKoppintson a(z) %s elemre a teljes könyvhöz.",
-        ["timeline_sort_newest"] = "Legújabb elöl",
-        ["timeline_sort_oldest"] = "Legrégebbi elöl",
     },
     ["id"] = {
         ["menu_timeline_all"] = "Semua",
         ["menu_timeline_presence_map"] = "Gunakan peta kehadiran di lini masa",
-        ["timeline_no_shared_chapters"] = "%s tidak pernah berada di bab yang sama.\\n\\nKetuk %s untuk melihat seluruh buku.",
-        ["timeline_sort_newest"] = "Terbaru dulu",
-        ["timeline_sort_oldest"] = "Terlama dulu",
     },
     ["it"] = {
         ["menu_timeline_all"] = "Tutti",
         ["menu_timeline_presence_map"] = "Usa la mappa delle presenze nella cronologia",
-        ["timeline_no_shared_chapters"] = "%s non compaiono nello stesso capitolo.\\n\\nTocca %s per vedere l'intero libro.",
-        ["timeline_sort_newest"] = "Più recenti prima",
-        ["timeline_sort_oldest"] = "Meno recenti prima",
     },
     ["ja"] = {
         ["menu_timeline_all"] = "すべて",
         ["menu_timeline_presence_map"] = "タイムラインで登場マップを使用",
-        ["timeline_no_shared_chapters"] = "%s は同じ章に登場しません。\\n\\n%s をタップすると本全体が表示されます。",
-        ["timeline_sort_newest"] = "新しい順",
-        ["timeline_sort_oldest"] = "古い順",
     },
     ["nl"] = {
         ["menu_timeline_all"] = "Alle",
         ["menu_timeline_presence_map"] = "Aanwezigheidskaart in tijdlijn gebruiken",
-        ["timeline_no_shared_chapters"] = "%s delen geen hoofdstuk.\\n\\nTik op %s om het hele boek te zien.",
-        ["timeline_sort_newest"] = "Nieuwste eerst",
-        ["timeline_sort_oldest"] = "Oudste eerst",
     },
     ["pl"] = {
         ["menu_timeline_all"] = "Wszystkie",
         ["menu_timeline_presence_map"] = "Użyj mapy obecności na osi czasu",
-        ["timeline_no_shared_chapters"] = "%s nie występują w tym samym rozdziale.\\n\\nDotknij %s, aby zobaczyć całą książkę.",
-        ["timeline_sort_newest"] = "Najnowsze najpierw",
-        ["timeline_sort_oldest"] = "Najstarsze najpierw",
     },
     ["pt_br"] = {
         ["menu_timeline_all"] = "Todos",
         ["menu_timeline_presence_map"] = "Usar mapa de presença na linha do tempo",
-        ["timeline_no_shared_chapters"] = "%s não compartilham nenhum capítulo.\\n\\nToque em %s para ver o livro inteiro.",
-        ["timeline_sort_newest"] = "Mais recentes primeiro",
-        ["timeline_sort_oldest"] = "Mais antigos primeiro",
     },
     ["ru"] = {
         ["menu_timeline_all"] = "Все",
         ["menu_timeline_presence_map"] = "Использовать карту присутствия на шкале времени",
-        ["timeline_no_shared_chapters"] = "%s не встречаются в одной главе.\\n\\nНажмите «%s», чтобы увидеть всю книгу.",
-        ["timeline_sort_newest"] = "Сначала новые",
-        ["timeline_sort_oldest"] = "Сначала старые",
     },
     ["sr"] = {
         ["menu_timeline_all"] = "Сви",
         ["menu_timeline_presence_map"] = "Користи мапу присуства на временској оси",
-        ["timeline_no_shared_chapters"] = "%s се не појављују у истом поглављу.\\n\\nДодирните %s да видите целу књигу.",
-        ["timeline_sort_newest"] = "Прво најновије",
-        ["timeline_sort_oldest"] = "Прво најстарије",
     },
     ["tr"] = {
         ["menu_timeline_all"] = "Tümü",
         ["menu_timeline_presence_map"] = "Zaman çizelgesinde varlık haritasını kullan",
-        ["timeline_no_shared_chapters"] = "%s hiçbir bölümü paylaşmıyor.\\n\\nTüm kitabı görmek için %s ögesine dokunun.",
-        ["timeline_sort_newest"] = "Önce en yeni",
-        ["timeline_sort_oldest"] = "Önce en eski",
     },
     ["uk"] = {
         ["menu_timeline_all"] = "Усі",
         ["menu_timeline_presence_map"] = "Використовувати карту присутності на шкалі часу",
-        ["timeline_no_shared_chapters"] = "%s не зустрічаються в одному розділі.\\n\\nНатисніть «%s», щоб побачити всю книгу.",
-        ["timeline_sort_newest"] = "Спочатку нові",
-        ["timeline_sort_oldest"] = "Спочатку старі",
     },
     ["zh_CN"] = {
         ["menu_timeline_all"] = "全部",
         ["menu_timeline_presence_map"] = "在时间线中使用出场图",
-        ["timeline_no_shared_chapters"] = "%s 没有出现在同一章节。\\n\\n点击「%s」查看整本书。",
-        ["timeline_sort_newest"] = "从新到旧",
-        ["timeline_sort_oldest"] = "从旧到新",
     },
 }
+
+end)()
+
+local Strip = (function()
+-- Presence strip for the stock timeline overlay (xray_entity_list.lua).
+-- Builds the widget the adapter slots under the overlay's header, owns the
+-- cache of rendered bitmaps, and knows the shape of the stock tree it goes
+-- into. It knows nothing about the plugin: the caller passes data and an
+-- on_toggle callback.
+--
+-- NOT loadable standalone: the build prepends the chunk-local `Presence`
+-- (src/xray_presencemap.lua). The spec sets _G.Presence instead.
+
+local Blitbuffer          = require("ffi/blitbuffer")
+local Button              = require("ui/widget/button")
+local CenterContainer     = require("ui/widget/container/centercontainer")
+local Font                = require("ui/font")
+local Geom                = require("ui/geometry")
+local GestureRange        = require("ui/gesturerange")
+local HorizontalGroup     = require("ui/widget/horizontalgroup")
+local HorizontalSpan      = require("ui/widget/horizontalspan")
+local ImageWidget         = require("ui/widget/imagewidget")
+local InputContainer      = require("ui/widget/container/inputcontainer")
+local LeftContainer       = require("ui/widget/container/leftcontainer")
+local LineWidget          = require("ui/widget/linewidget")
+local ScrollableContainer = require("ui/widget/container/scrollablecontainer")
+local Screen              = require("device").screen
+local TextWidget          = require("ui/widget/textwidget")
+local VerticalGroup       = require("ui/widget/verticalgroup")
+local VerticalSpan        = require("ui/widget/verticalspan")
+
+local M = {}
+
+M.VISIBLE_ROWS = 4
+-- The mouse wheel arrives as a pan, and long-press belongs to the rows.
+local IGNORED_GESTURES = { "pan", "pan_release", "hold", "hold_release", "hold_pan" }
+
+local function sc(n) return Screen:scaleBySize(n) end
+
+-- All in scale units. name_width and the row metrics are what the SVG
+-- builders draw with; col_width is filled in once the column count is known.
+local function geometry(sw, scrolls)
+    local pad = sc(6)
+    local sbw = scrolls and ScrollableContainer:getScrollbarWidth() or 0
+    local name_width = math.floor(sw * 0.22)
+    local viewport_w = sw - pad * 2 - name_width - sbw
+    return {
+        pad = pad,
+        viewport_w = viewport_w,
+        max_cols = math.max(1, math.floor(viewport_w / sc(16))),
+        name_width = name_width,
+        row_height = sc(20),
+        top_padding = sc(6),
+        marker = sc(9),
+        label_size = sc(9),
+    }
+end
+
+function M.freeBitmaps(overlay)
+    local cache = overlay._presence_bitmaps
+    overlay._presence_bitmaps = nil
+    if not cache then return end
+    for _, key in ipairs({ "names", "grid" }) do
+        local bb = cache[key]
+        if bb and bb.free then bb:free() end
+    end
+end
+
+-- Rasterize each half at exactly its own size; a mismatch would send
+-- renderimage down its scaling path and blur the pips.
+local function render(order, selected, matrix, columns, match_cols, geom)
+    local RenderImage = require("ui/renderimage")
+    local names_svg, nw, nh = Presence.buildStripNamesSVG(order, selected, geom)
+    local grid_svg, gw, gh = Presence.buildStripGridSVG(
+        matrix, order, columns, selected, geom, match_cols)
+    local ok_n, names_bb = pcall(RenderImage.renderImageData, RenderImage,
+        names_svg, #names_svg, false, nw, nh)
+    local ok_g, grid_bb = pcall(RenderImage.renderImageData, RenderImage,
+        grid_svg, #grid_svg, false, gw, gh)
+    if ok_n and names_bb and ok_g and grid_bb then
+        return { names = names_bb, grid = grid_bb, height = nh }
+    end
+    if ok_n and names_bb and names_bb.free then names_bb:free() end
+    if ok_g and grid_bb and grid_bb.free then grid_bb:free() end
+    return nil
+end
+
+-- Bitmaps live on the overlay across its rebuilds (every page turn and
+-- d-pad move rebuilds the whole tree) and are replaced when the key changes.
+local function bitmapsFor(overlay, key, ...)
+    local cache = overlay._presence_bitmaps
+    if cache and cache.key == key then return cache end
+    M.freeBitmaps(overlay)
+    cache = render(...)
+    if cache then
+        cache.key = key
+        overlay._presence_bitmaps = cache
+    end
+    return cache
+end
+
+-- The name gutter as a tap target. paintTo records where it was drawn, so
+-- a tap's y can be turned into a row even inside a scrolled container.
+local function namesWidget(bb, geom, order, on_toggle)
+    local image = ImageWidget:new{ image = bb, image_disposable = false }
+    local names = InputContainer:new{ image }
+    local size = image:getSize()
+    names.dimen = Geom:new{ x = 0, y = 0, w = size.w, h = size.h }
+    names.ges_events = {
+        Tap = { GestureRange:new{ ges = "tap", range = function() return names.dimen end } },
+    }
+    function names:getSize() return image:getSize() end
+    function names:paintTo(target, x, y)
+        local s = image:getSize()
+        self.dimen = Geom:new{ x = x, y = y, w = s.w, h = s.h }
+        image:paintTo(target, x, y)
+    end
+    function names:onTap(_, ges)
+        local row = Presence.rowAt(ges.pos.y - self.dimen.y, geom, #order)
+        if row then on_toggle(order[row]) end
+        return true
+    end
+    return names
+end
+
+local function captionRow(sw, text, all_button)
+    local label = TextWidget:new{
+        text = text,
+        face = Font:getFace("cfont", 13),
+        bold = true,
+        fgcolor = Blitbuffer.COLOR_BLACK,
+        max_width = sw - sc(40) - all_button:getSize().w,
+    }
+    local gap = math.max(sc(8), sw - sc(32) - label:getSize().w - all_button:getSize().w)
+    return LeftContainer:new{
+        dimen = Geom:new{ w = sw, h = sc(24) },
+        HorizontalGroup:new{
+            align = "center",
+            HorizontalSpan:new{ width = sc(16) },
+            label,
+            HorizontalSpan:new{ width = gap },
+            all_button,
+        },
+    }
+end
+
+-- ctx: data {matrix, order, chapters}, selected (names), matches (row
+-- indices from Presence.matchingChapters), sw (px), all_label,
+-- on_toggle(name or nil for "All"), scroll (saved offset or nil).
+-- Returns widget, height  or  nil, reason.
+function M.build(overlay, ctx)
+    local order, selected = ctx.data.order, ctx.selected
+    local n_rows = #order
+    local scrolls = n_rows > M.VISIBLE_ROWS
+    local filtering = #selected > 0
+    local sw = ctx.sw
+    local geom = geometry(sw, scrolls)
+
+    -- One column per chapter while they stay at least 16 units wide; past
+    -- that each column covers a span so the whole book still fits.
+    local matrix, columns, match_cols = ctx.data.matrix, ctx.data.chapters, ctx.matches
+    if #columns > geom.max_cols then
+        matrix, match_cols, columns = Presence.bucketMatrix(matrix, ctx.matches, geom.max_cols)
+    end
+    geom.col_width = math.floor(geom.viewport_w / math.max(1, #columns))
+
+    local key = table.concat(selected, "\n") .. "|" .. tostring(sw)
+    local bbs = bitmapsFor(overlay, key, order, selected, matrix, columns, match_cols, geom)
+    if not bbs then
+        overlay._presence_widgets = nil
+        return nil, "strip render failed"
+    end
+
+    local widgets = { names = namesWidget(bbs.names, geom, order, ctx.on_toggle) }
+    local body = HorizontalGroup:new{
+        align = "top",
+        HorizontalSpan:new{ width = geom.pad },
+        widgets.names,
+        ImageWidget:new{ image = bbs.grid, image_disposable = false },
+    }
+
+    local parts = VerticalGroup:new{ align = "left" }
+    local height = 0
+
+    if filtering then
+        widgets.all = Button:new{
+            text = ctx.all_label,
+            text_font_size = 13,
+            padding = sc(2),
+            bordersize = sc(1),
+            radius = sc(4),
+            callback = function() ctx.on_toggle(nil) end,
+        }
+        table.insert(parts, captionRow(sw,
+            Presence.captionText(selected, #ctx.matches), widgets.all))
+        height = height + sc(24)
+    end
+
+    if scrolls then
+        local view_h = Presence.stripHeight(M.VISIBLE_ROWS, geom)
+        local scroller = ScrollableContainer:new{
+            dimen = Geom:new{ w = sw, h = view_h },
+            ignore_events = IGNORED_GESTURES,
+            show_parent = overlay,
+            body,
+        }
+        if ctx.scroll then
+            -- A filter change cannot shrink the strip (rows never hide), but
+            -- clamp anyway so a stale offset can never scroll past the end.
+            local max_offset = math.max(0, bbs.height - view_h)
+            scroller:setScrolledOffset(Geom:new{
+                x = 0, y = math.max(0, math.min(ctx.scroll.y or 0, max_offset)) })
+        end
+        widgets.scroller = scroller
+        table.insert(parts, scroller)
+        height = height + view_h
+    else
+        table.insert(parts, body)
+        height = height + bbs.height
+    end
+
+    table.insert(parts, CenterContainer:new{
+        dimen = Geom:new{ w = sw, h = sc(1) },
+        LineWidget:new{
+            background = Blitbuffer.Color8(180),
+            dimen = Geom:new{ w = sw - sc(32), h = sc(1) },
+        },
+    })
+    table.insert(parts, VerticalSpan:new{ width = sc(4) })
+    height = height + sc(1) + sc(4)
+
+    overlay._presence_widgets = widgets
+    return parts, height
+end
+
+-- Slot the strip into the tree the beta's buildUI builds:
+--   overlay[1]        OverlapGroup { dimen }
+--     [1]             main surface FrameContainer { height, [1] = VerticalGroup { header, list } }
+--     [2]             BottomContainer { dimen } holding the footer
+-- The stock code was run with a screen shorter by the strip's height, so
+-- every height it recorded is put back to full_h here.
+function M.insert(overlay, strip, full_h)
+    local top = overlay[1]
+    if type(top) ~= "table" or type(top.dimen) ~= "table" then return false end
+    local surface, footer = top[1], top[2]
+    if type(surface) ~= "table" or type(surface.height) ~= "number" then return false end
+    if type(footer) ~= "table" or type(footer.dimen) ~= "table" then return false end
+    local vg = surface[1]
+    if type(vg) ~= "table" or #vg ~= 2 then return false end
+    if type(overlay.dimen) ~= "table" then return false end
+
+    table.insert(vg, 2, strip)
+    if vg.resetLayout then vg:resetLayout() end
+    surface.height = full_h
+    top.dimen.h = full_h
+    top._size = nil
+    footer.dimen.h = full_h
+    overlay.dimen.h = full_h
+    return true
+end
+
+return M
 
 end)()
 
