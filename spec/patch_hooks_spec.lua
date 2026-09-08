@@ -341,8 +341,8 @@ describe("patch hooks", function()
                 assert.are.equal(2, o.build_count)
                 assert.are.equal(1, captured.dirty)
                 assert.are.equal(2, #o.items)
-                -- the caption now takes 24px more
-                assert.are.equal(800 - 99, o.seen_sh)
+                -- the caption band now takes the button's height plus 4
+                assert.are.equal(800 - (75 + 28), o.seen_sh)
             end)
         end)
 

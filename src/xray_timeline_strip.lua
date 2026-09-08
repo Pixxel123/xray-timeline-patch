@@ -133,7 +133,14 @@ local function namesWidget(bb, geom, order, on_toggle)
     return names
 end
 
-local function captionRow(sw, text, all_button)
+-- The band has to be at least as tall as the button: LeftContainer centres
+-- its child on dimen.h without growing, so a taller button would spill past
+-- the band and have its bottom border painted over by the body below.
+local function captionHeight(all_button)
+    return math.max(sc(24), all_button:getSize().h + sc(4))
+end
+
+local function captionRow(sw, text, all_button, cap_h)
     local label = TextWidget:new{
         text = text,
         face = Font:getFace("cfont", 13),
@@ -143,7 +150,7 @@ local function captionRow(sw, text, all_button)
     }
     local gap = math.max(sc(8), sw - sc(32) - label:getSize().w - all_button:getSize().w)
     return LeftContainer:new{
-        dimen = Geom:new{ w = sw, h = sc(24) },
+        dimen = Geom:new{ w = sw, h = cap_h },
         HorizontalGroup:new{
             align = "center",
             HorizontalSpan:new{ width = sc(16) },
@@ -204,9 +211,10 @@ function M.build(overlay, ctx)
             radius = sc(4),
             callback = function() ctx.on_toggle(nil) end,
         }
+        local cap_h = captionHeight(widgets.all)
         table.insert(parts, captionRow(sw,
-            Presence.captionText(selected, #ctx.matches), widgets.all))
-        height = height + sc(24)
+            Presence.captionText(selected, #ctx.matches), widgets.all, cap_h))
+        height = height + cap_h
     end
 
     if scrolls then

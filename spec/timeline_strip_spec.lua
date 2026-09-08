@@ -35,8 +35,10 @@ local function ctx(d, selected, extra)
 end
 
 -- Loads src/xray_timeline_strip.lua under stubs and runs fn(Strip, captured).
-local function run(fn)
+-- tweak(stubs) may adjust a stub before the module is loaded.
+local function run(fn, tweak)
     local captured, stubs = stubs_mod.make()
+    if tweak then tweak(stubs) end
     stubs_mod.with(stubs, function()
         _G.Presence = dofile("src/xray_presencemap.lua")
         local Strip = dofile("src/xray_timeline_strip.lua")
@@ -62,16 +64,31 @@ describe("timeline strip", function()
             end)
         end)
 
-        it("adds a 24px caption with an All button while filtering", function()
+        it("adds a caption band tall enough for the All button while filtering", function()
             run(function(Strip)
                 local overlay = {}
                 local c = ctx(data(3), { "Victor" })
                 local _, height = Strip.build(overlay, c)
-                assert.equals(99, height)
+                -- the 24px stub button plus 4px of breathing room, so its
+                -- bottom border is inside the band the body is stacked under
+                assert.equals(75 + 28, height)
                 assert.is_table(overlay._presence_widgets.all)
                 assert.equals(overlay, overlay._presence_widgets.all.show_parent)
                 overlay._presence_widgets.all.callback()
                 assert.equals("<all>", c.toggled[1])
+            end)
+        end)
+
+        it("grows the caption band when the All button is taller", function()
+            run(function(Strip)
+                local overlay = {}
+                local _, height = Strip.build(overlay, ctx(data(3), { "Victor" }))
+                -- a 60px button needs a 64px band, not the 24px minimum
+                assert.equals(75 + 64, height)
+            end, function(stubs)
+                stubs["ui/widget/button"] = {
+                    new = function(_, t) t.getSize = function() return { w = 40, h = 60 } end; return t end,
+                }
             end)
         end)
 
