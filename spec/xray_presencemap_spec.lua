@@ -463,4 +463,45 @@ describe("xray_presencemap", function()
         end)
 
     end)
+
+    describe("rowAt", function()
+        local GEOM = { top_padding = 6, row_height = 19 }
+
+        it("returns nil above the first row", function()
+            assert.is_nil(presence.rowAt(5, GEOM, 3))
+            assert.is_nil(presence.rowAt(-1, GEOM, 3))
+        end)
+
+        it("maps the first and last pixel of a row to that row", function()
+            assert.equals(1, presence.rowAt(6, GEOM, 3))
+            assert.equals(1, presence.rowAt(24, GEOM, 3))
+            assert.equals(2, presence.rowAt(25, GEOM, 3))
+            assert.equals(3, presence.rowAt(62, GEOM, 3))
+        end)
+
+        it("returns nil past the last row", function()
+            assert.is_nil(presence.rowAt(63, GEOM, 3))
+            assert.is_nil(presence.rowAt(200, GEOM, 3))
+        end)
+
+        it("returns nil for a non-number", function()
+            assert.is_nil(presence.rowAt(nil, GEOM, 3))
+        end)
+    end)
+
+    describe("captionText", function()
+        it("joins the names with a middle dot and appends the count", function()
+            assert.equals("Victor \u{00B7} Creature (9)", presence.captionText({ "Victor", "Creature" }, 9))
+        end)
+
+        it("is empty for an empty selection", function()
+            assert.equals("", presence.captionText({}, 3))
+            assert.equals("", presence.captionText(nil, 3))
+        end)
+
+        it("shows zero when nothing matches", function()
+            assert.equals("Victor (0)", presence.captionText({ "Victor" }, 0))
+            assert.equals("Victor (0)", presence.captionText({ "Victor" }, nil))
+        end)
+    end)
 end)

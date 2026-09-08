@@ -364,4 +364,21 @@ function M.buildStripGridSVG(matrix, order, chapters, selected, geom, match_cols
     return table.concat(out, "\n"), width, height
 end
 
+-- Which row a tap lands on. y_rel is measured from the top of the names
+-- image, in the units geom uses. nil above the first row or past the last.
+function M.rowAt(y_rel, geom, n_rows)
+    if type(y_rel) ~= "number" or y_rel < geom.top_padding then return nil end
+    local row = math.floor((y_rel - geom.top_padding) / geom.row_height) + 1
+    if row < 1 or row > (n_rows or 0) then return nil end
+    return row
+end
+
+-- The filter caption: names joined by a middle dot, then the number of
+-- matching chapters in the stock title's "(N)" style, so it needs no
+-- translated words. Empty when nothing is selected.
+function M.captionText(selected, n_matches)
+    if not selected or #selected == 0 then return "" end
+    return table.concat(selected, " \u{00B7} ") .. " (" .. tostring(n_matches or 0) .. ")"
+end
+
 return M
