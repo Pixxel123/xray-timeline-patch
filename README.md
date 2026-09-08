@@ -2,14 +2,14 @@
 
 A [KOReader user patch](https://github.com/koreader/koreader/wiki/User-patches)
 for the [X-Ray plugin](https://github.com/ultimatejimmy/xray.koplugin) that
-replaces the plot-timeline menu with a scrolling view topped by a **character
-presence map**: one row per character, one column per chapter, marked wherever
-that character appears. Tap one character to filter chapters; tap two to find
-the chapters they share. Includes a sort-direction toggle, jump-to-end
-chevrons, and a collapsible block for prior books in a series.
+adds a **character presence map** to the plugin's own plot-timeline screen:
+one row per character, one column per chapter, marked wherever that
+character appears. Tap a name to list only that character's chapters; tap a
+second to find the chapters they share.
 
-The plugin itself is never modified: delete the file and the stock
-timeline is back.
+Everything else on the screen is the plugin's: search, paging, the
+prior-books row and the event details. The plugin itself is never modified;
+delete the file and the stock timeline is back.
 
 ## Install
 
@@ -19,22 +19,37 @@ timeline is back.
    KOReader settings if it doesn't exist).
 3. Restart KOReader and open **X-Ray → Plot Timeline**.
 
-Toggle the map under **Use Presence Map in Timeline** at the
-bottom of the X-Ray menu.
+Toggle the map under **Use Presence Map in Timeline** at the bottom of the
+X-Ray menu.
+
+## Using it
+
+- Characters named in at least two chapters get a row, most-present first (a
+  protagonist is kept regardless, and the cut is skipped when it would leave
+  fewer than three rows). Four rows are visible; swipe up and down inside the
+  map for more.
+- Tap a name to filter the list to that character's chapters. Tap another
+  to keep only the chapters they share. Tap a selected name again to drop
+  it, or **All** to clear the filter.
+- The plugin's search box and the filter combine.
+- On devices without a touch screen the map is shown but cannot be tapped.
 
 ## Compatibility
 
-- X-Ray plugin **26.7.27** or newer; KOReader **2026.07** or newer (tested).
-- On an incompatible plugin version the patch logs one warning and leaves
-  the stock timeline untouched.
+- X-Ray plugin **26.9.4-beta** or newer (the first version with the
+  full-screen timeline); KOReader **2026.07** or newer (tested).
+- On an older plugin the patch logs one warning and leaves the stock
+  timeline untouched. For plugin versions 26.7.27 to 26.9.2-beta use
+  [release v1.0.0](../../releases/tag/v1.0.0), which carries its own
+  timeline screen.
+- If a future plugin release changes the timeline's layout, the patch logs
+  one warning and shows the plain stock list until it is updated.
 - Translated into the plugin's 17 languages.
 
 ## Limitations
 
 - The F-Droid build of KOReader does not run user patches; use the release
   APK (`org.koreader.launcher`).
-- While installed, the patch supersedes the plugin's own timeline screen,
-  including future upstream improvements to it.
 
 ## Development
 
@@ -42,9 +57,7 @@ Tests: `luajit tools/spec_runner.lua` (self-contained runner, no luarocks).
 The installable file is generated: edit `src/`, then `luajit
 tools/build.lua`; CI fails if the committed artifact drifts from `src/`.
 
-Syncing from the development branch (`timeline-presence-map` on the plugin
-fork): copy `xray_presencemap.lua` and its spec verbatim; re-splice the
-`showTimeline` region into `src/patch_main.lua` between the REGION markers,
-re-applying the three adaptations documented there (field name
-`timeline_menu`, inlined `Presence`, `pluginRequire`); re-run
-`tools/extract_translations.lua` if keys changed; rebuild.
+Layout: `src/xray_presencemap.lua` is pure logic (matrix, order, SVG),
+`src/xray_timeline_strip.lua` the strip widget, `src/patch_main.lua` the
+adapter that wraps the plugin's `EntityListOverlay`. Design notes live in
+`docs/superpowers/specs/`.
