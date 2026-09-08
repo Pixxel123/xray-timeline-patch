@@ -245,21 +245,8 @@ function M.bucketMatrix(matrix, chapter_matches, n_buckets)
     return buckets, matches, ranges
 end
 
--- Which characters get a row: the selection, or everyone when unfiltered.
--- Shared with the UI's height calculation so the two cannot disagree.
-function M.shownNames(order, selected)
-    if not selected or #selected == 0 then return order end
-    local is_selected = {}
-    for _, name in ipairs(selected) do is_selected[name] = true end
-    local rows = {}
-    for _, name in ipairs(order) do
-        if is_selected[name] then rows[#rows + 1] = name end
-    end
-    return rows
-end
-
--- Pixel height of a strip with this many character rows. Exported so the UI's
--- scroll cap cannot drift from what the renderers draw.
+-- Pixel height of a strip with this many rows. Exported so the strip
+-- widget's scroll viewport cannot drift from what the renderers draw.
 function M.stripHeight(n_rows, geom)
     return geom.top_padding + n_rows * geom.row_height + 4
 end
@@ -279,40 +266,54 @@ local function svgOpen(w, h)
     }
 end
 
--- The left gutter: one name per row. Split from the grid so it stays put while
--- the grid scrolls. Returns svg, width, height.
+local function selectedSet(selected)
+    local set = {}
+    for _, name in ipairs(selected or {}) do set[name] = true end
+    return set
+end
+
+-- The left gutter: one name per row, every row in `order`. Selected names
+-- are bold on a shaded band. Split from the grid so it stays put while the
+-- grid scrolls. Returns svg, width, height.
 function M.buildStripNamesSVG(order, selected, geom)
-    local rows = M.shownNames(order, selected)
-    local width, height = geom.name_width, M.stripHeight(#rows, geom)
+    local is_selected = selectedSet(selected)
+    local width, height = geom.name_width, M.stripHeight(#order, geom)
     local out = svgOpen(width, height)
-    for r, name in ipairs(rows) do
+    for r, name in ipairs(order) do
         local y = geom.top_padding + (r - 1) * geom.row_height + geom.row_height / 2
+        if is_selected[name] then
+            out[#out + 1] = string.format(
+                '<rect class="band" x="0" y="%.1f" width="%d" height="%d" fill="#e3e6df"/>',
+                y - geom.row_height / 2, width, geom.row_height)
+        end
         out[#out + 1] = string.format(
-            '<text class="cname" x="%.1f" y="%.1f" font-size="%d" text-anchor="end" fill="black">%s</text>',
-            width - 7, y + 3, geom.label_size + 2, xmlEscape(name))
+            '<text class="cname" x="%.1f" y="%.1f" font-size="%d" text-anchor="end" fill="black"%s>%s</text>',
+            width - 7, y + 3, geom.label_size + 2,
+            is_selected[name] and ' font-weight="bold"' or "", xmlEscape(name))
     end
     out[#out + 1] = "</svg>"
     return table.concat(out, "\n"), width, height
 end
 
--- The grid: columns as chapters (or bucketed spans), one row per shown name.
--- Returns svg, width, height.
+-- The grid: columns as chapters (or bucketed spans), one row per name in
+-- `order`. Returns svg, width, height.
 --
--- Every column is kept while filtering, to show where in the book the matches
--- fall. Matching columns are shaded. Two or more selections draw a join line,
--- which is safe because only selected characters have rows here.
+-- Every row and every column stays while filtering, so the reader can see
+-- where the matches fall against everyone else. Selected rows get a band,
+-- matching columns a shade, and two or more selections a join line from the
+-- first selected row to the last.
 --
 -- match_cols must be passed in. A bucketed matrix has already lost the
 -- per-chapter detail, so the crossings cannot be worked out here.
 function M.buildStripGridSVG(matrix, order, chapters, selected, geom, match_cols)
-    local rows = M.shownNames(order, selected)
-    local filtering = selected and #selected > 0
+    local is_selected = selectedSet(selected)
+    local filtering = selected ~= nil and #selected > 0
 
     local matches = {}
     for _, idx in ipairs(match_cols or {}) do matches[idx] = true end
 
-    local ncols = #chapters
-    local width, height = ncols * geom.col_width, M.stripHeight(#rows, geom)
+    local nrows, ncols = #order, #chapters
+    local width, height = ncols * geom.col_width, M.stripHeight(nrows, geom)
     local out = svgOpen(width, height)
 
     local function colX(i) return (i - 1) * geom.col_width + geom.col_width / 2 end
@@ -320,24 +321,35 @@ function M.buildStripGridSVG(matrix, order, chapters, selected, geom, match_cols
         return geom.top_padding + (r - 1) * geom.row_height + geom.row_height / 2
     end
 
+    local first_sel, last_sel
+    for r, name in ipairs(order) do
+        if is_selected[name] then
+            first_sel = first_sel or r
+            last_sel = r
+            out[#out + 1] = string.format(
+                '<rect class="band" x="0" y="%.1f" width="%d" height="%d" fill="#e3e6df"/>',
+                rowY(r) - geom.row_height / 2, width, geom.row_height)
+        end
+    end
+
     if filtering then
-        local join = #rows >= 2
+        local join = first_sel ~= nil and last_sel > first_sel
         for i = 1, ncols do
             if matches[i] then
                 out[#out + 1] = string.format(
-                    '<rect class="shade" x="%.1f" y="%.1f" width="%d" height="%.1f" fill="#e3e6df"/>',
+                    '<rect class="shade" x="%.1f" y="%.1f" width="%d" height="%.1f" fill="#d5d9cf"/>',
                     colX(i) - geom.col_width / 2, geom.top_padding - 4,
-                    geom.col_width, #rows * geom.row_height + 4)
+                    geom.col_width, nrows * geom.row_height + 4)
                 if join then
                     out[#out + 1] = string.format(
                         '<line class="join" x1="%.1f" y1="%.1f" x2="%.1f" y2="%.1f" stroke="black" stroke-width="2"/>',
-                        colX(i), rowY(1), colX(i), rowY(#rows))
+                        colX(i), rowY(first_sel), colX(i), rowY(last_sel))
                 end
             end
         end
     end
 
-    for r, name in ipairs(rows) do
+    for r, name in ipairs(order) do
         for i = 1, ncols do
             if matrix[i] and matrix[i][name] then
                 out[#out + 1] = string.format(

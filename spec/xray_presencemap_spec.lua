@@ -300,10 +300,19 @@ describe("xray_presencemap", function()
                 end
             end)
 
-            it("writes only the selected names when filtering", function()
+            it("writes every name while filtering, bold on a band for the selected", function()
                 local svg = presence.buildStripNamesSVG(order, { "Victor" }, GEOM)
-                assert.is_not_nil(svg:find(">Victor<", 1, true))
-                assert.is_nil(svg:find(">Walton<", 1, true))
+                assert.is_not_nil(svg:find(">Walton<", 1, true))
+                assert.equals(1, count(svg, "band"))
+                assert.is_not_nil(svg:find('font%-weight="bold">Victor<'))
+                assert.is_nil(svg:find('font%-weight="bold">Walton<'))
+            end)
+
+            it("keeps its height at one row per name whatever is selected", function()
+                local _, _, h_all = presence.buildStripNamesSVG(order, {}, GEOM)
+                local _, _, h_sel = presence.buildStripNamesSVG(order, { "Victor" }, GEOM)
+                assert.equals(h_all, h_sel)
+                assert.equals(presence.stripHeight(#order, GEOM), h_sel)
             end)
 
         end)
@@ -334,6 +343,23 @@ describe("xray_presencemap", function()
                     presence.matchingChapters(matrix, { "Creature", "Walton" }))
                 assert.equals(1, count(svg, "shade"))
                 assert.equals(1, count(svg, "join"))
+                assert.equals(2, count(svg, "band"))
+            end)
+
+            it("runs the join between the selected rows only", function()
+                local svg = presence.buildStripGridSVG(matrix, order, chapters, { "Creature", "Walton" }, GEOM,
+                    presence.matchingChapters(matrix, { "Creature", "Walton" }))
+                local y1, y2 = svg:match('class="join" x1="[%d%.]+" y1="([%d%.]+)" x2="[%d%.]+" y2="([%d%.]+)"')
+                -- rows 2 and 3: top_padding 6 + (row-1) * 19 + 19/2
+                assert.equals("34.5", y1)
+                assert.equals("53.5", y2)
+            end)
+
+            it("keeps every row's markers while filtering", function()
+                local svg = presence.buildStripGridSVG(matrix, order, chapters, { "Victor" }, GEOM,
+                    presence.matchingChapters(matrix, { "Victor" }))
+                assert.equals(6, count(svg, "pip"))
+                assert.equals(1, count(svg, "band"))
             end)
 
             it("uses caller-supplied matches when given", function()
