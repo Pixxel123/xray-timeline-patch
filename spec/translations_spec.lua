@@ -1,8 +1,7 @@
 require("spec.spec_helper")
 
 describe("translations", function()
-    local KEYS = { "menu_timeline_all", "menu_timeline_presence_map",
-        "timeline_no_shared_chapters", "timeline_sort_newest", "timeline_sort_oldest" }
+    local KEYS = { "menu_timeline_all", "menu_timeline_presence_map" }
     local T = loadfile("src/translations.lua") and dofile("src/translations.lua") or {}
 
     it("covers all 17 languages", function()
@@ -23,10 +22,16 @@ describe("translations", function()
         end
     end)
 
+    it("carries no dropped keys", function()
+        for lang, entries in pairs(T) do
+            local n = 0
+            for _ in pairs(entries) do n = n + 1 end
+            assert.are.equal(2, n, tostring(lang) .. " has extra keys")
+        end
+    end)
+
     it("keeps the English strings the code falls back to", function()
         assert.are.equal("All", T.en.menu_timeline_all)
         assert.are.equal("Use Presence Map in Timeline", T.en.menu_timeline_presence_map)
-        assert.are.equal("Oldest first", T.en.timeline_sort_oldest)
-        assert.are.equal("Newest first", T.en.timeline_sort_newest)
     end)
 end)
