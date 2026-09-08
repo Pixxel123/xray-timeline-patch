@@ -142,7 +142,7 @@ local specs = {
     "spec/xray_presencemap_spec.lua",
     "spec/translations_spec.lua",
     "spec/timeline_strip_spec.lua",
-    "spec/patch_smoke_spec.lua",
+    "spec/patch_hooks_spec.lua",
 }
 
 if arg and arg[1] then
