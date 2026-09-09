@@ -1,9 +1,8 @@
 # xray-timeline-patch v2 — decouple the UI from the stock timeline
 
 Date: 2026-09-08
-Status: approved in chat (design + mockup); awaiting spec review
+Status: implemented and released as v2.0.0 (2026-09-09)
 Supersedes: v1.0.0 (full timeline replacement ported from fork commit c082f69)
-Mockup: https://claude.ai/code/artifact/812843c6-f6ba-4957-960f-c5bf2643dcb8
 
 ## Goal
 
@@ -36,9 +35,8 @@ screen, as before.
 | Empty result | Stock "No items found"; the caption still names the filter |
 | Floor | 26.9.4-beta (first release with `xray_entity_list`). Older plugins get one warning and the stock timeline; README points them at v1.0.0 |
 | Source of truth | This repo. The fork-branch sync procedure and REGION markers are removed |
-| Local test runtime | `~/Programming/koreader` main fast-forwarded to upstream main (e3708ff); link farm relinked (28 entries) |
 | Version | 2.0.0; artifact filename unchanged (`patches/2-xray-timeline-presence-map.lua`) so users replace one file |
-| Release | Branch `decouple-ui` committed and pushed; tagging and the GitHub release stay with the user |
+| Release | v2.0.0 tagged from main; artifact filename unchanged so users replace one file |
 
 ## Runtime architecture
 
@@ -52,9 +50,9 @@ plugin *class*; it is idempotent via `XRayPlugin.__timeline_patch_applied`.
 
 1. Runs the capability check (below). On failure: one `logger.warn`
    naming the missing piece, and return with nothing installed.
-2. Installs on the plugin class: `presenceMapEnabled(self)` (reads setting
-   `timeline_presence_map`, unset = on) and `settingEnabled` (absent-only,
-   as v1).
+2. Installs on the plugin class, absent-only in both cases: `presenceMapEnabled(self)`
+   (reads setting `timeline_presence_map`, unset = on) and `settingEnabled`
+   (as v1).
 3. Wraps `XRayPlugin.getSubMenuItems` to inject translations and append the
    menu entry (as v1). The entry's callback flips the setting and, if
    `self.timeline_menu` is open, calls stock `self:showTimeline()`, which
@@ -240,7 +238,7 @@ spec/patch_hooks_spec.lua    replaces patch_smoke_spec.lua (below)
 spec/translations_spec.lua   2 keys
 patches/2-xray-timeline-presence-map.lua  regenerated
 README.md                    rewritten
-docs/superpowers/specs/      this file (+ plan)
+docs/superpowers/specs/      this file
 ```
 
 ## Testing
@@ -279,9 +277,8 @@ unchanged; SVG specs updated (all names drawn, bold + band for selected,
 column shade + join between selected row indices); new `rowAt` and
 `captionText` specs.
 
-Manual, in the desktop AppImage (`./dev/dev.sh run` from
-`~/Programming/koreader`, plugin now at beta via the link farm; built patch
-copied to `~/.config/koreader/patches/`): open X-Ray → Plot Timeline with a
+Manual, in the desktop AppImage with the plugin at 26.9.4-beta and the built
+patch copied into KOReader's `patches/` folder: open X-Ray → Plot Timeline with a
 book that has timeline + characters; check strip below the header, 4 rows
 + scroll, tap filters and clears, page turns keep the strip, prior-books row
 present unfiltered and absent while filtering, menu toggle removes/restores
