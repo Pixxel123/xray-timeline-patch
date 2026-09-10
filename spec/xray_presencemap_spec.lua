@@ -392,6 +392,24 @@ describe("xray_presencemap", function()
                 assert.equals("57.0", h)
             end)
 
+            it("shades shared columns at least two e-ink grey levels darker than the row band", function()
+                local svg = presence.buildStripGridSVG(matrix, order, chapters, { "Creature", "Walton" }, GEOM,
+                    presence.matchingChapters(matrix, { "Creature", "Walton" }))
+                -- Kindle framebuffers quantise to 16 greys; a band and a shade that
+                -- round to the same level cannot be told apart on the device.
+                local function level(hex)
+                    local r, g, b = hex:match("^#(%x%x)(%x%x)(%x%x)$")
+                    local luma = 0.299 * tonumber(r, 16) + 0.587 * tonumber(g, 16) + 0.114 * tonumber(b, 16)
+                    return math.floor(luma / 17 + 0.5)
+                end
+                local band = svg:match('class="band"[^>]-fill="(#%x+)"')
+                local shade = svg:match('class="shade"[^>]-fill="(#%x+)"')
+                assert.is_not_nil(band)
+                assert.is_not_nil(shade)
+                assert.is_true(level(band) - level(shade) >= 2,
+                    "band level " .. level(band) .. " vs shade level " .. level(shade))
+            end)
+
             it("draws no join for a single selected character", function()
                 local svg = presence.buildStripGridSVG(matrix, order, chapters, { "Victor" }, GEOM,
                     presence.matchingChapters(matrix, { "Victor" }))

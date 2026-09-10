@@ -191,7 +191,7 @@ the stock UI is built untouched, with one `logger.warn`.
   always draw every name in `order`.
 - Selected rows: names SVG draws a full-width `rect` fill `#e3e6df` behind the
   row and the name in `font-weight="bold"`; grid SVG draws the same row band.
-- Matching columns (while filtering): column `rect` fill `#d5d9cf` spanning
+- Matching columns (while filtering): column `rect` fill `#bfc4b8` (two e-ink grey levels below the band) spanning
   all rows, drawn before pips; join `line` from the first to the last
   *selected* row index when two or more names are selected.
 - New pure helpers: `M.rowAt(y_rel, geom, n_rows)` → row index or nil;

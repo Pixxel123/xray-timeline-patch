@@ -337,7 +337,7 @@ function M.buildStripGridSVG(matrix, order, chapters, selected, geom, match_cols
         for i = 1, ncols do
             if matches[i] then
                 out[#out + 1] = string.format(
-                    '<rect class="shade" x="%.1f" y="%.1f" width="%d" height="%.1f" fill="#d5d9cf"/>',
+                    '<rect class="shade" x="%.1f" y="%.1f" width="%d" height="%.1f" fill="#bfc4b8"/>',
                     colX(i) - geom.col_width / 2, geom.top_padding,
                     geom.col_width, nrows * geom.row_height)
                 if join then
