@@ -1,7 +1,7 @@
 -- Concatenates src/ into patches/2-xray-timeline-presence-map.lua.
 -- Run from the repo root: luajit tools/build.lua
 
-local PATCH_VERSION = "2.0.1"
+local PATCH_VERSION = "2.0.2"
 local PLUGIN_FLOOR  = "26.9.4-beta"   -- first release with xray_entity_list.lua, the timeline overlay
 
 local function slurp(path)
