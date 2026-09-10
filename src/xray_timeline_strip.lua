@@ -49,6 +49,7 @@ local function geometry(sw, scrolls)
         name_width = name_width,
         row_height = sc(20),
         top_padding = sc(6),
+        bottom_padding = sc(4),
         marker = sc(9),
         label_size = sc(9),
     }

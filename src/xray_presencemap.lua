@@ -248,7 +248,7 @@ end
 -- Pixel height of a strip with this many rows. Exported so the strip
 -- widget's scroll viewport cannot drift from what the renderers draw.
 function M.stripHeight(n_rows, geom)
-    return geom.top_padding + n_rows * geom.row_height + 4
+    return geom.top_padding + n_rows * geom.row_height + (geom.bottom_padding or 4)
 end
 
 local XML_ESCAPES = { ["&"] = "&amp;", ["<"] = "&lt;", [">"] = "&gt;", ['"'] = "&quot;" }
@@ -338,8 +338,8 @@ function M.buildStripGridSVG(matrix, order, chapters, selected, geom, match_cols
             if matches[i] then
                 out[#out + 1] = string.format(
                     '<rect class="shade" x="%.1f" y="%.1f" width="%d" height="%.1f" fill="#d5d9cf"/>',
-                    colX(i) - geom.col_width / 2, geom.top_padding - 4,
-                    geom.col_width, nrows * geom.row_height + 4)
+                    colX(i) - geom.col_width / 2, geom.top_padding,
+                    geom.col_width, nrows * geom.row_height)
                 if join then
                     out[#out + 1] = string.format(
                         '<line class="join" x1="%.1f" y1="%.1f" x2="%.1f" y2="%.1f" stroke="black" stroke-width="2"/>',

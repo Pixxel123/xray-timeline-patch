@@ -286,6 +286,16 @@ describe("xray_presencemap", function()
             return n
         end
 
+        describe("stripHeight", function()
+            it("adds the geometry's bottom padding below the rows", function()
+                assert.equals(6 + 3 * 19 + 10,
+                    presence.stripHeight(3, { top_padding = 6, row_height = 19, bottom_padding = 10 }))
+            end)
+            it("falls back to four units of bottom padding", function()
+                assert.equals(6 + 3 * 19 + 4, presence.stripHeight(3, { top_padding = 6, row_height = 19 }))
+            end)
+        end)
+
         describe("buildStripNamesSVG", function()
 
             it("is exactly the name gutter wide", function()
@@ -371,6 +381,15 @@ describe("xray_presencemap", function()
                 -- column 1 is the shaded one, not column 3 as derivation would give
                 local x = tonumber(svg:match('class="shade" x="([%-%d%.]+)"'))
                 assert.is_true(x < GEOM.col_width)
+            end)
+
+            it("shades exactly the rows, with no overhang above the first band", function()
+                local svg = presence.buildStripGridSVG(matrix, order, chapters, { "Victor" }, GEOM,
+                    presence.matchingChapters(matrix, { "Victor" }))
+                local y, h = svg:match('class="shade" x="[%-%d%.]+" y="([%-%d%.]+)" width="%d+" height="([%d%.]+)"')
+                -- top_padding 6, three rows of 19
+                assert.equals("6.0", y)
+                assert.equals("57.0", h)
             end)
 
             it("draws no join for a single selected character", function()
