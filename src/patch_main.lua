@@ -66,6 +66,12 @@ local function injectTranslations(self)
             loc.translations[key] = exact[key] or en_value
         end
     end
+    -- The plugin's English catalogue leaves no_items untranslated, so every
+    -- empty list reads "no_items". Only that raw key is replaced; a real
+    -- translation is left alone.
+    if loc.translations.no_items == "no_items" then
+        loc.translations.no_items = "No items found"
+    end
 end
 
 -- Per-overlay presence data, computed once per open. The stock showTimeline
@@ -155,19 +161,37 @@ end
 local function wrapBuildUI(Overlay)
     local orig = Overlay.buildUI
     Overlay.buildUI = function(self, ...)
+        -- Every list screen gets the translation fix-ups (the English
+        -- no_items repair applies to all of them, and the timeline can open
+        -- from a gesture without the menu ever being built).
+        if self.plugin then injectTranslations(self.plugin) end
         -- A tree shape rejected once will not be recognised on a later
         -- rebuild either, so stop building a strip and running stock twice.
         if warned.layout or not isActive(self) then return orig(self, ...) end
         local data = ensureData(self)
         if #data.order == 0 or #data.chapters == 0 then return orig(self, ...) end
 
-        -- The timeline can open from a gesture without the menu ever being
-        -- built, so the "All" label is injected here too.
-        injectTranslations(self.plugin)
         local filter = currentFilter(self, data)
         local widgets = self._presence_widgets
         local scroller = widgets and widgets.scroller
         local loc = self.plugin.loc
+
+        -- Stock draws its own empty state. When the character filter is what
+        -- emptied the list, say so instead of "No items found"; the plugin's
+        -- own search message keeps priority while a search is typed. The
+        -- string is swapped in for the stock call only.
+        local no_shared = #filter > 0 and #(self.items or {}) == 0
+            and (self.search_query == nil or self.search_query == "")
+        local function stock(...)
+            if not (no_shared and loc and type(loc.translations) == "table") then
+                return orig(self, ...)
+            end
+            local saved = loc.translations.no_items
+            loc.translations.no_items = loc:t("timeline_no_shared_chapters")
+            local ok, err = pcall(orig, self, ...)
+            loc.translations.no_items = saved
+            if not ok then error(err, 0) end
+        end
         -- Strip.build runs inside the overlay's init, so anything that threw
         -- in there would take KOReader's main loop down with it.
         local built, strip, height = pcall(Strip.build, self, {
@@ -186,11 +210,11 @@ local function wrapBuildUI(Overlay)
             warnOnce("render", "strip build failed: " .. tostring(strip)
                 .. " - showing the stock timeline without the map")
             Strip.releaseWidgets(self)
-            return orig(self, ...)
+            return stock(...)
         end
         if not strip then
             warnOnce("render", tostring(height) .. " - showing the stock timeline without the map")
-            return orig(self, ...)
+            return stock(...)
         end
 
         -- Stock budgets its rows from self.sh. Lend it a screen shorter by
@@ -198,14 +222,14 @@ local function wrapBuildUI(Overlay)
         -- the real height back whatever happened.
         local full_h = self.sh
         self.sh = full_h - height
-        local ok, err = pcall(orig, self, ...)
+        local ok, err = pcall(stock, ...)
         self.sh = full_h
         if not ok then error(err, 0) end
 
         if not Strip.insert(self, strip, full_h) then
             warnOnce("layout", "overlay layout not recognised - showing the stock timeline without the map")
             Strip.releaseWidgets(self)
-            return orig(self, ...)
+            return stock(...)
         end
     end
 end

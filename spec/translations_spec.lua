@@ -1,7 +1,7 @@
 require("spec.spec_helper")
 
 describe("translations", function()
-    local KEYS = { "menu_timeline_all", "menu_timeline_presence_map" }
+    local KEYS = { "menu_timeline_all", "menu_timeline_presence_map", "timeline_no_shared_chapters" }
     local T = loadfile("src/translations.lua") and dofile("src/translations.lua") or {}
 
     it("covers all 17 languages", function()
@@ -26,12 +26,13 @@ describe("translations", function()
         for lang, entries in pairs(T) do
             local n = 0
             for _ in pairs(entries) do n = n + 1 end
-            assert.are.equal(2, n, tostring(lang) .. " has extra keys")
+            assert.are.equal(3, n, tostring(lang) .. " has extra keys")
         end
     end)
 
     it("keeps the English strings the code falls back to", function()
         assert.are.equal("All", T.en.menu_timeline_all)
         assert.are.equal("Use Presence Map in Timeline", T.en.menu_timeline_presence_map)
+        assert.are.equal("Selected characters don't share any chapters", T.en.timeline_no_shared_chapters)
     end)
 end)

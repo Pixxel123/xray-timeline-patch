@@ -36,6 +36,16 @@ local function fakeOverlayClass()
             { dimen = { w = 600, h = self.sh } },
         }
         self.dimen = { x = 0, y = 0, w = 600, h = self.sh }
+        -- Stock's empty state: the search message wins, else the no_items string.
+        self.empty_text = nil
+        if #(self.items or {}) == 0 then
+            local loc = self.plugin and self.plugin.loc
+            if self.search_query and self.search_query ~= "" then
+                self.empty_text = "No items matching " .. self.search_query
+            else
+                self.empty_text = (loc and loc:t("no_items")) or "No items found"
+            end
+        end
     end
     return O
 end
@@ -393,6 +403,54 @@ describe("patch hooks", function()
                 names:onTap(nil, { pos = { x = 5, y = 100 + 6 + 3 } })
                 assert.are.equal(1, #captured.warnings)
                 assert.is_not_nil(captured.warnings[1]:find("kaboom", 1, true))
+            end)
+        end)
+
+    end)
+
+    describe("empty state", function()
+
+        -- Justine appears only in a chapter of her own, so she and the
+        -- Creature never share one.
+        local function pluginWithJustine(class)
+            local plugin = pluginInstance(class)
+            table.insert(plugin.timeline, { chapter = "Chapter 4", event = "Justine is tried." })
+            table.insert(plugin.characters, { name = "Justine" })
+            plugin.loc.translations.no_items = "no_items"
+            return plugin
+        end
+
+        it("names the cause when the selected characters share no chapter", function()
+            withPatch(function(captured, _, class, Overlay)
+                local plugin = pluginWithJustine(class)
+                plugin.timeline_filter = { "Creature", "Justine" }
+                local o = openTimeline(Overlay, plugin)
+                assert.are.equal(0, #o.items)
+                assert.are.equal("Selected characters don't share any chapters", o.empty_text)
+                -- the override lasted for the stock call only
+                assert.are.equal("No items found", plugin.loc.translations.no_items)
+                assert.are.equal(0, #captured.warnings)
+            end)
+        end)
+
+        it("keeps the stock search message when a search emptied the list", function()
+            withPatch(function(_, _, class, Overlay)
+                local plugin = pluginWithJustine(class)
+                plugin.timeline_filter = { "Creature", "Justine" }
+                local o = openTimeline(Overlay, plugin, { search_query = "zzz" })
+                assert.are.equal("No items matching zzz", o.empty_text)
+            end)
+        end)
+
+        it("repairs the plugin's untranslated English no_items on every list", function()
+            withPatch(function(_, _, class, Overlay)
+                local plugin = pluginInstance(class)
+                plugin.loc.translations.no_items = "no_items"
+                Overlay:new{ plugin = plugin, mode = "characters", raw_items = {} }
+                assert.are.equal("No items found", plugin.loc.translations.no_items)
+                plugin.loc.translations.no_items = "Keine Elemente"
+                Overlay:new{ plugin = plugin, mode = "characters", raw_items = {} }
+                assert.are.equal("Keine Elemente", plugin.loc.translations.no_items)
             end)
         end)
 

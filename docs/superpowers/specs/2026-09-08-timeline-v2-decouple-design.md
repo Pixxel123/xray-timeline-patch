@@ -32,7 +32,7 @@ screen, as before.
 | Caption | Only while filtering: `Holden · Naomi (9)` left, `All` right. Language-neutral: names plus a count in the stock title's `(N)` style |
 | Dropped | Sort-direction toggle, jump-to-end chevrons, custom prior-books block, custom row list, custom title bar, "never share a chapter" message |
 | Prior-book events | Listed by stock when not filtering; dropped from the list while filtering (they are not in the matrix, so they can never match) |
-| Empty result | Stock "No items found"; the caption still names the filter |
+| Empty result | Patch text "Selected characters don't share any chapters" (17 languages) when the character filter emptied the list and no search is typed, swapped into the stock `no_items` string for that one rebuild; stock's search message otherwise. The plugin's untranslated English `no_items` is repaired to "No items found" for every list |
 | Floor | 26.9.4-beta (first release with `xray_entity_list`). Older plugins get one warning and the stock timeline; README points them at v1.0.0 |
 | Source of truth | This repo. The fork-branch sync procedure and REGION markers are removed |
 | Version | 2.0.0; artifact filename unchanged (`patches/2-xray-timeline-presence-map.lua`) so users replace one file |
